@@ -1,0 +1,50 @@
+{
+  "name": "@wide-search-toolkit/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for wide-search: search_wide, fetch_pages, and list_vendors.",
+  "license": "MIT",
+  "author": "Spenser Hale",
+  "homepage": "https://github.com/spenserhale/wide-search-toolkit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spenserhale/wide-search-toolkit.git",
+    "directory": "packages/mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/spenserhale/wide-search-toolkit/issues"
+  },
+  "keywords": ["search", "web-search", "mcp", "fastmcp", "agents"],
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "wide-search-mcp": "./dist/index.js"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "build": "bun build ./src/index.ts --outdir ./dist --target node --format esm --packages external && chmod +x ./dist/index.js",
+    "inspect": "npx fastmcp inspect src/index.ts",
+    "prepublishOnly": "bun run build",
+    "test": "bun test",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@wide-search-toolkit/sdk": "workspace:*",
+    "fastmcp": "^3.0.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
+  }
+}

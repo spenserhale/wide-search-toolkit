@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.env.local
+tests/e2e/*.env
+*.tsbuildinfo
+*.bun-build
+.DS_Store
+bun.lockb

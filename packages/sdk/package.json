@@ -1,0 +1,47 @@
+{
+  "name": "@wide-search-toolkit/sdk",
+  "version": "0.1.0",
+  "description": "Core SDK for wide-search: vendor adapters, fan-out engine, dedupe, ranking, cache, and safe page fetching.",
+  "license": "MIT",
+  "author": "Spenser Hale",
+  "homepage": "https://github.com/spenserhale/wide-search-toolkit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spenserhale/wide-search-toolkit.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/spenserhale/wide-search-toolkit/issues"
+  },
+  "keywords": ["search", "web-search", "sdk", "exa", "tavily", "parallel", "firecrawl", "tinyfish"],
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "bun run build:js && bun run build:types",
+    "build:js": "bun build ./src/index.ts --outdir ./dist --target node --format esm",
+    "build:types": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "bun run build",
+    "test": "bun test",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
+  }
+}

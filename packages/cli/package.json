@@ -1,0 +1,42 @@
+{
+  "name": "@wide-search-toolkit/cli",
+  "version": "0.1.0",
+  "description": "Agent-native CLI for wide-search: fan one query out to multiple web-search vendors and merge the results.",
+  "license": "MIT",
+  "author": "Spenser Hale",
+  "homepage": "https://github.com/spenserhale/wide-search-toolkit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spenserhale/wide-search-toolkit.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/spenserhale/wide-search-toolkit/issues"
+  },
+  "keywords": ["search", "web-search", "cli", "agents", "stricli"],
+  "type": "module",
+  "bin": {
+    "wide-search": "./dist/bin.js"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "bun run src/bin.ts",
+    "build": "bun build ./src/bin.ts --outdir ./dist --target node --format esm --packages external && chmod +x ./dist/bin.js",
+    "build:skill": "bun run scripts/build-skill.ts",
+    "prepublishOnly": "bun run build",
+    "test": "bun test",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@stricli/core": "^1.0.0",
+    "@toon-format/toon": "^4.1.1",
+    "@wide-search-toolkit/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
+  }
+}

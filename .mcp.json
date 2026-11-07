@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "wide-search": {
+      "command": "bun",
+      "args": ["run", "packages/mcp/src/index.ts"]
+    }
+  }
+}

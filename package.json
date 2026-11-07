@@ -1,0 +1,29 @@
+{
+  "name": "wide-search-toolkit",
+  "private": true,
+  "description": "Multi-vendor wide web search: SDK, CLI, MCP server, and agent skill.",
+  "homepage": "https://github.com/spenserhale/wide-search-toolkit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spenserhale/wide-search-toolkit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/spenserhale/wide-search-toolkit/issues"
+  },
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "bun run --filter '*' build",
+    "dev:cli": "bun run --filter '@wide-search-toolkit/cli' dev",
+    "dev:mcp": "bun run --filter '@wide-search-toolkit/mcp' dev",
+    "test": "bun test",
+    "test:e2e:op": "WIDE_SEARCH_OP_E2E=1 bun test packages/cli/tests/op.e2e.test.ts packages/mcp/tests/op.e2e.test.ts",
+    "lint": "bun run --filter '@wide-search-toolkit/sdk' build && bun run --filter '*' lint",
+    "build:skill": "bun run packages/cli/scripts/build-skill.ts",
+    "agent-context": "bun run packages/cli/src/bin.ts agent-context --json",
+    "clean": "rm -rf packages/*/dist packages/*/node_modules node_modules"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
+  }
+}
