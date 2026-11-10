@@ -80,6 +80,7 @@ const ENVIRONMENT: Record<string, string> = {
   WIDE_SEARCH_ALLOW_PRIVATE_HOSTS: "Set 1 to allow private-network fetch targets (explicit opt-in)",
   WIDE_SEARCH_USER_AGENT: "User-Agent sent to vendors and fetched pages",
   WIDE_SEARCH_CONFIG_FILE: "Path to a JSON config file (default: ~/.config/wide-search/config.json)",
+  WIDE_SEARCH_KEYCHAIN: "Set to 0 to skip reading vendor keys from the OS keychain (default: on)",
 };
 
 export function buildAgentContext(root: unknown): AgentContext {
@@ -150,8 +151,8 @@ export function buildAgentContext(root: unknown): AgentContext {
       "fetch refuses private-network targets by default; this is an explicit config opt-in, not a per-call MCP argument.",
       "Default selection is all configured vendors, cheapest first, until the per-call budget is exhausted.",
       "The merged result keeps each vendor's best rank for a URL; a vendor cannot stuff the ranking with duplicate URLs.",
-      "The CLI finds .env by walking up from its cwd and inherits your shell exports; an MCP host may launch the server from a different cwd and does not necessarily inherit your shell environment, so put keys in the host env block, ~/.config/wide-search/config.json, or an op run wrapper.",
-      "MCP host env values and user-config keys are plaintext at rest; use an op run wrapper or op inject when keys must not be stored in plaintext.",
+      "The CLI finds .env by walking up from its cwd and inherits your shell exports; an MCP host may launch the server from a different cwd and does not necessarily inherit your shell environment, so store keys in the OS keychain with `wide-search auth set` (no host env block needed), or use the host env block or an op run wrapper.",
+      "MCP host env values and user-config keys are plaintext at rest; use the OS keychain (`wide-search auth set`, `auth migrate`) or an op run wrapper when keys must not be stored in plaintext.",
     ],
     commands: describeTree(root),
   };

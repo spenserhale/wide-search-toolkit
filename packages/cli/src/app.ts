@@ -5,6 +5,10 @@ import { vendorsCommand } from "./commands/vendors.js";
 import { configShowCommand } from "./commands/config/show.js";
 import { cacheClearCommand } from "./commands/cache/clear.js";
 import { cacheStatsCommand } from "./commands/cache/stats.js";
+import { authSetCommand } from "./commands/auth/set.js";
+import { authListCommand } from "./commands/auth/list.js";
+import { authDeleteCommand } from "./commands/auth/delete.js";
+import { authMigrateCommand } from "./commands/auth/migrate.js";
 import { agentContextCommand } from "./commands/agent-context.js";
 import { feedbackCommand } from "./commands/feedback.js";
 import { CLI_NAME, CLI_VERSION } from "./version.js";
@@ -28,11 +32,24 @@ const configRoutes = buildRouteMap({
   },
 });
 
+const authRoutes = buildRouteMap({
+  routes: {
+    set: authSetCommand,
+    list: authListCommand,
+    delete: authDeleteCommand,
+    migrate: authMigrateCommand,
+  },
+  docs: {
+    brief: "Store, list, and remove vendor keys in the OS keychain",
+  },
+});
+
 const routes = buildRouteMap({
   routes: {
     search: searchCommand,
     fetch: fetchCommand,
     vendors: vendorsCommand,
+    auth: authRoutes,
     config: configRoutes,
     cache: cacheRoutes,
     "agent-context": agentContextCommand,

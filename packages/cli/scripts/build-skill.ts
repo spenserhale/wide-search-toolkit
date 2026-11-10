@@ -106,7 +106,7 @@ function markdown(): string {
     lines.push(`- \`${key}\` — ${description}`);
   }
   lines.push("");
-  lines.push("Precedence: process environment > nearest `.env` walking up from cwd > `~/.config/wide-search/config.json` > built-in default. `config show` reports the winning source for each value and never prints a secret.");
+  lines.push("Precedence: process environment > nearest `.env` walking up from cwd > OS keychain (`wide-search auth set`) > `~/.config/wide-search/config.json` > built-in default. `config show` reports the winning source for each value and never prints a secret.");
   lines.push("");
   lines.push("## Exit codes");
   lines.push("");

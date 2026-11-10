@@ -41,15 +41,24 @@ One query should be able to use several independent search indexes without the c
 
 ### Configuration resolution
 
-- The CLI, MCP server, and SDK share one resolver: process environment, nearest `.env` walking up from cwd, `~/.config/wide-search/config.json`, then default. Process environment wins.
+- The CLI, MCP server, and SDK share one resolver: process environment, nearest `.env` walking up from cwd, the OS keychain (vendor keys only), `~/.config/wide-search/config.json`, then default. Process environment wins.
+- `loadConfig()` asks the keychain (service `wide-search`, entries named by env var) only for keys env and `.env` did not supply, through `Bun.secrets`. A store failure sets `keychain.status` to `unavailable` and never fails the call; `WIDE_SEARCH_KEYCHAIN=0` sets it to `disabled`. `resolveConfig()` stays synchronous and does not read the keychain unless given `keychainValues`.
 - The CLI gets the process environment from its shell, `op run`, or CI, and finds a project `.env` by walking up from the directory where it runs.
-- The MCP server gets the process environment from the host's `env` block and inherited env. Its cwd is host-controlled, so a project `.env` is only found when the host launches inside that project. The reliable MCP paths are the host `env`, the user config, or an `op run` wrapper.
+- The MCP server gets the process environment from the host's `env` block and inherited env. Its cwd is host-controlled, so a project `.env` is only found when the host launches inside that project. The reliable MCP paths are the keychain (no `env` block needed), the host `env`, the user config, or an `op run` wrapper.
 - `wide-search config show` is the CLI diagnostic and reports winning sources with keys as set/missing. `list_vendors` is the MCP diagnostic. Both `search` and `search_wide` report per-vendor configuration gaps in `vendors[]`.
-- `.env` files, user-config `keys`, and literal MCP host `env` values are plaintext at rest. `op run --env-file=<op-reference-template>` is the supported no-plaintext setup for both surfaces; the E2E tests use `op inject` in memory.
+- `.env` files, user-config `keys`, and literal MCP host `env` values are plaintext at rest. The OS keychain and `op run --env-file=<op-reference-template>` are the supported no-plaintext setups for both surfaces; the E2E tests use `op inject` in memory.
+
+### Credential management
+
+- `wide-search auth set <vendor>` stores a vendor's keys in the keychain. On a TTY it prompts with hidden input for each key; `--stdin` reads one key from stdin and needs `--key` for a two-key vendor (DataForSEO). Without a TTY and without `--stdin` it exits 2. It never accepts a key as an argument. `--dry-run` validates without writing. Output reports `stored`/`would_store` per key and `shadowed_by` when env or `.env` still overrides the stored value.
+- `wide-search auth list` reports each credential key's keychain state (`set`, `missing`, or `unknown` when the store is unavailable) and active source, never values.
+- `wide-search auth delete <vendor>` removes keychain entries, reports `deleted` or `not_found`, requires `--yes`, and supports `--dry-run`.
+- `wide-search auth migrate` stores keys whose active source is a `.env` file or the user config, skips keys already in the keychain unless `--overwrite`, ignores process-environment keys, supports `--dry-run`, and lists the files to clean in `clean_up`. It does not edit files.
+- The MCP server has no tool that writes or deletes secrets.
 
 ### Surfaces
 
-- The CLI exposes `search`, `fetch`, `vendors`, `config show`, `cache clear|stats`, `agent-context`, and `feedback`.
+- The CLI exposes `search`, `fetch`, `vendors`, `auth set|list|delete|migrate`, `config show`, `cache clear|stats`, `agent-context`, and `feedback`.
 - The MCP server exposes `search_wide`, `fetch_pages`, and `list_vendors`.
 - `agent-context` and `wide-search-cli/SKILL.md` are derived from the live Stricli route tree.
 
@@ -61,6 +70,8 @@ One query should be able to use several independent search indexes without the c
 - The engine merges overlapping results, selects vendors cheapest-first, rejects a zero budget, returns partial results, marks all-failed reports, reports unconfigured vendors, caches only complete success, and times out a slow vendor without blocking others (`packages/sdk/tests/engine.test.ts`).
 - The cache writes/reads, expires, tolerates corruption, respects TTL zero, clears, and reports stats (`packages/sdk/tests/cache.test.ts`).
 - Config precedence, `.env` walk-up, config-file credentials, redaction, and unknown-vendor rejection hold (`packages/sdk/tests/config.test.ts`).
+- Keychain credentials rank below env and `.env` and above the config file, are looked up only when missing, can be disabled, and an unavailable store does not fail resolution (`packages/sdk/tests/secrets.test.ts`).
+- `auth` set/list/delete/migrate store trimmed values, honor `--dry-run`, flag shadowed keys, never emit values, skip existing keys on migrate, and leave env keys alone (`packages/cli/tests/auth.test.ts`); the CLI refuses `auth set` without a TTY or `--stdin`, refuses `--stdin` for a two-key vendor without `--key`, and requires `--yes` for `auth delete` (`packages/cli/tests/cli.e2e.test.ts`).
 - HTML extraction and SSRF address checks hold; page fetching blocks private targets by default, follows redirects, decompresses gzip, truncates oversized bodies, and enforces the aggregate cap (`packages/sdk/tests/fetch.test.ts`).
 - The CLI emits agent context, lists nine vendors with no credentials, exits 3 on no configured vendor, and rejects two format flags (`packages/cli/tests/cli.e2e.test.ts`).
 - The MCP server registers the three tools with read-only annotations and bounded JSON text output, and a stdio client can list tools and call `list_vendors` (`packages/mcp/src/tools/register.test.ts`, `packages/mcp/src/tools/stdio.e2e.test.ts`).
@@ -91,3 +102,4 @@ One query should be able to use several independent search indexes without the c
 - [0004: Cache only complete successful aggregates](../decisions/0004-cache-policy.md)
 - [0005: Guard page fetching against SSRF by default](../decisions/0005-fetch-ssrf-posture.md)
 - [0006: Inject E2E vendor keys in memory with op inject](../decisions/0006-op-inject-e2e-secrets.md)
+- [0007: Store vendor keys in the OS keychain with Bun.secrets](../decisions/0007-os-keychain-credential-store.md)

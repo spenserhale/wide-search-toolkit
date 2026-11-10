@@ -1,5 +1,5 @@
 import { buildCommand } from "@stricli/core";
-import { redactedConfig, resolveConfig } from "@wide-search-toolkit/sdk";
+import { redactedConfig, loadConfig } from "@wide-search-toolkit/sdk";
 import { runCommand } from "../../lib/errors.js";
 import { formatFlags, type FormatFlagValues } from "../../lib/flags.js";
 import { emit } from "../../lib/output.js";
@@ -16,7 +16,7 @@ export const configShowCommand = buildCommand({
   },
   async func(this: void, flags: FormatFlagValues) {
     await runCommand(async () => {
-      const config = redactedConfig(resolveConfig());
+      const config = redactedConfig(await loadConfig());
       await emit(config, flags, {
         text: () => JSON.stringify(config, null, 2),
       });

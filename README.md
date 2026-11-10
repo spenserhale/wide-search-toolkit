@@ -17,7 +17,7 @@ The CLI and MCP server are thin consumers. All API and ranking logic lives in th
 ## What you get
 
 - **SDK**: `searchWide()` returns merged results plus a per-vendor report; `fetchPages()` reads full page text with SSRF and size guards.
-- **CLI**: `wide-search search`, `fetch`, `vendors`, `config show`, `cache clear|stats`, `agent-context`, `feedback`.
+- **CLI**: `wide-search search`, `fetch`, `vendors`, `auth set|list|delete|migrate`, `config show`, `cache clear|stats`, `agent-context`, `feedback`.
 - **MCP server**: `search_wide`, `fetch_pages`, `list_vendors`.
 - **Skill**: `wide-search-cli/SKILL.md`, generated from the live command tree.
 
@@ -25,18 +25,19 @@ The CLI and MCP server are thin consumers. All API and ranking logic lives in th
 
 ```bash
 bun install
-cp .env.example .env
-# Set at least one vendor key in .env
-bun run dev:cli -- search "latest approaches to hybrid retrieval" --json
+bash scripts/install.sh            # build and symlink wide-search into ~/.local/bin
 
-# Or build and symlink the binary into ~/.local/bin
-bash scripts/install.sh
+wide-search auth set exa            # hidden prompt; stored in the OS keychain
+wide-search search "latest approaches to hybrid retrieval" --json
 ```
+
+Prefer a file? `cp .env.example .env` and fill in at least one key; it works, but it is plaintext at rest.
 
 Useful first commands:
 
 ```bash
 wide-search vendors                                      # which keys are configured?
+wide-search auth list                                    # keychain state and active source per key
 wide-search search "query" --vendor exa --vendor tavily   # narrow the candidate set
 wide-search search "query" --mode fast --budget-usd 0.01  # cheaper, faster fan-out
 wide-search fetch https://example.com/article --json      # full page text
@@ -76,13 +77,47 @@ Partial vendor failure exits 0; read `vendors[]` instead of treating an empty re
 The CLI and MCP server share one resolver; only where the process environment comes from differs.
 
 ```
-process environment  >  nearest .env walking up from cwd  >  ~/.config/wide-search/config.json  >  built-in default
+process environment  >  nearest .env walking up from cwd  >  OS keychain  >  ~/.config/wide-search/config.json  >  built-in default
 ```
 
 | Surface | Process environment comes from | Project `.env` | Recommended persistent setup |
 |---|---|---|---|
-| CLI | your shell, `op run`, or CI | walks up from cwd | `op run --env-file=... -- wide-search ...` |
-| MCP | the host's `env` block plus inherited env | only if the server's cwd is inside the project | host `env`, user config, or an `op run` wrapper |
+| CLI | your shell, `op run`, or CI | walks up from cwd | `wide-search auth set <vendor>` (keychain) or `op run` |
+| MCP | the host's `env` block plus inherited env | only if the server's cwd is inside the project | keychain (no `env` block) or an `op run` wrapper |
+
+### Keys in the OS keychain
+
+`wide-search auth` stores keys with `Bun.secrets` in macOS Keychain, Linux libsecret, or Windows Credential Manager (service `wide-search`, one entry per env var name). Both the CLI and the MCP server read them, so neither needs keys in a file.
+
+```bash
+# Interactive: hidden prompt, nothing echoed
+wide-search auth set exa
+wide-search auth set dataforseo                 # prompts for login, then password
+
+# Non-interactive (scripts, agents): pipe the value, one key per call
+pbpaste | wide-search auth set tavily --stdin
+op read 'op://Private/DataForSEO/password' | wide-search auth set dataforseo --key DATAFORSEO_PASSWORD --stdin
+
+wide-search auth list                           # set/missing and active source, never values
+wide-search auth migrate --dry-run              # preview moving .env / config-file keys into the keychain
+wide-search auth migrate                        # then remove the keys from the listed clean_up files
+wide-search auth delete exa --yes
+```
+
+Keys are never accepted as arguments, so they stay out of shell history. Env vars and `.env` still win over the keychain, so `op run` and CI behave as before; `WIDE_SEARCH_KEYCHAIN=0` turns the lookup off. With keys in the keychain, the MCP host config needs no `env` block:
+
+```json
+{
+  "mcpServers": {
+    "wide-search": {
+      "command": "bun",
+      "args": ["run", "/absolute/path/to/wide-search-toolkit/packages/mcp/src/index.ts"]
+    }
+  }
+}
+```
+
+### Other setups
 
 A terminal `export` works for the CLI immediately. For MCP it works only when the host inherited that shell environment — a GUI host launched by the operating system usually did not. If a key works in the CLI but not in MCP, check the host's cwd and `env` block first. `wide-search config show` reports the CLI's winning source per value; `wide-search vendors` and the MCP `list_vendors` tool show which vendors are configured.
 

@@ -9,6 +9,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - Configuration guide covering the shared resolver, CLI vs MCP environment setup, plaintext trade-offs, `op run` templates, and MCP host diagnostics.
+- OS keychain credential storage via `Bun.secrets` (macOS Keychain, Linux libsecret, Windows Credential Manager). The resolver order is now env > `.env` > keychain > user config > default; the keychain is only queried for missing keys, and `WIDE_SEARCH_KEYCHAIN=0` disables it.
+- `wide-search auth set|list|delete|migrate`: store keys with a hidden prompt or `--stdin`, list keychain state and active source, delete with `--yes`, and move plaintext `.env` / config-file keys into the keychain. All mutations support `--dry-run`.
+- The MCP server reads keychain keys, so host configs no longer need an `env` block with literal keys.
+- SDK `loadConfig()` (async, keychain-aware) and `SecretStore` / `bunSecretStore()` exports; `config show` reports `keychain` status and a `keychain` credential source.
+
+### Changed
+
+- `searchWide()` without an explicit `config`, and every CLI command and MCP tool, now resolve configuration with `loadConfig()` instead of `resolveConfig()`.
 
 ## [0.1.0] - 2026-11-07
 

@@ -1,7 +1,7 @@
 ---
 title: "Plan: OS keychain credentials and auth commands"
 description: "Store vendor keys in the OS keychain via Bun.secrets, add `wide-search auth set|list|delete|migrate`, and resolve keychain keys in the CLI and MCP server."
-status: approved
+status: done
 date: 2026-11-09
 size: bounded
 specs: ["wide-search"]

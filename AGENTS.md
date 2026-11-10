@@ -17,7 +17,7 @@ bun run build:skill
 WIDE_SEARCH_OP_E2E=1 bun run test:e2e:op   # live five-vendor check via op inject
 ```
 
-The CLI reads vendor keys from the process environment, the nearest `.env` walking up from cwd, or `~/.config/wide-search/config.json`. At least one vendor key is required for a search. `bun run lint` builds the SDK declarations first because the CLI and MCP packages import the published SDK types. The live E2E command requires an unlocked 1Password CLI and is skipped by the default test run.
+The CLI reads vendor keys from the process environment, the nearest `.env` walking up from cwd, the OS keychain (`wide-search auth set`), or `~/.config/wide-search/config.json`. Tests must never touch the real keychain: inject an in-memory `SecretStore`, or set `WIDE_SEARCH_KEYCHAIN=0` for spawned processes. At least one vendor key is required for a search. `bun run lint` builds the SDK declarations first because the CLI and MCP packages import the published SDK types. The live E2E command requires an unlocked 1Password CLI and is skipped by the default test run.
 
 ## Repo layout
 
@@ -48,7 +48,7 @@ Templates: `_template.md` in `docs/specs/`, `docs/decisions/`, and `docs/plans/`
 Before editing, check whether the task touches one of these areas and read the guide first:
 
 - Vendor adapter contracts, costs, or a new vendor: `docs/guides/vendors.md`
-- CLI vs MCP environment setup, `.env`, user config, or `op run`: `docs/guides/configuration.md`
+- CLI vs MCP environment setup, `.env`, OS keychain / `auth` commands, user config, or `op run`: `docs/guides/configuration.md`
 - Fetching, SSRF, secrets, or delivery: `docs/guides/security.md`
 - Tests, fixtures, or live-vs-mocked boundaries: `docs/guides/testing.md`
 - TODO Release (`docs/guides/release.md`): changesets, npm publishing, and standalone binaries; write it when the toolkit gets its first release workflow.

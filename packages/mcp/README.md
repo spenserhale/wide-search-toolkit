@@ -12,12 +12,33 @@ FastMCP stdio server for wide-search.
 
 ## Setup
 
-MCP hosts can provide credentials in four ways:
+MCP hosts can provide credentials in five ways:
 
-1. **Host `env` block** — the normal persistent option; values are plaintext in the host config.
+0. **OS keychain (recommended)** — store keys once with the CLI (`wide-search auth set <vendor>`); the server reads them on each tool call, so the host config needs no `env` block and holds no secrets.
+1. **Host `env` block** — works without a keychain; values are plaintext in the host config.
 2. **Inherited terminal environment** — works only when the host was launched from that shell.
 3. **User config** — `~/.config/wide-search/config.json`; reliable regardless of host cwd, plaintext if it contains `keys`.
 4. **`op run` wrapper** — no plaintext at rest; the host runs `op run --env-file=<op-reference-template> -- bun run ...`.
+
+### Option 0: keychain, no `env` block
+
+```bash
+wide-search auth set exa          # hidden prompt
+pbpaste | wide-search auth set tavily --stdin
+```
+
+```json
+{
+  "mcpServers": {
+    "wide-search": {
+      "command": "bun",
+      "args": ["run", "/absolute/path/to/wide-search-toolkit/packages/mcp/src/index.ts"]
+    }
+  }
+}
+```
+
+Keys added or rotated with `auth set` are picked up on the next tool call without restarting the host. On macOS the first read from a new binary may show a Keychain access dialog; choose Always Allow.
 
 ### Option 1: host `env` block
 
@@ -38,7 +59,7 @@ MCP hosts can provide credentials in four ways:
 
 ### Options 2 and 3: inherited terminal env or user config
 
-The server uses the same resolver as the CLI: process environment, nearest `.env` from cwd, `~/.config/wide-search/config.json`, then defaults. An MCP host supplies the process environment and chooses the cwd; it does not automatically share your interactive shell. Exports from the same terminal are inherited only if the host was launched from that shell. Putting non-secret defaults in `~/.config/wide-search/config.json` works regardless of host cwd.
+The server uses the same resolver as the CLI: process environment, nearest `.env` from cwd, OS keychain, `~/.config/wide-search/config.json`, then defaults. An MCP host supplies the process environment and chooses the cwd; it does not automatically share your interactive shell. Exports from the same terminal are inherited only if the host was launched from that shell. Putting non-secret defaults in `~/.config/wide-search/config.json` works regardless of host cwd.
 
 ### Option 4: `op run` wrapper
 

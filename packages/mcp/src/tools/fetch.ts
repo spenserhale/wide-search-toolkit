@@ -2,7 +2,7 @@ import type { FastMCP } from "fastmcp";
 import { z } from "zod";
 import {
   fetchPages,
-  resolveConfig,
+  loadConfig,
 } from "@wide-search-toolkit/sdk";
 
 export function registerFetchTools(server: FastMCP): void {
@@ -53,7 +53,7 @@ export function registerFetchTools(server: FastMCP): void {
       openWorldHint: true,
     },
     execute: async (args) => {
-      const config = resolveConfig();
+      const config = await loadConfig();
       const report = await fetchPages({
         urls: args.urls,
         maxCharsPerPage: args.max_chars_per_page,

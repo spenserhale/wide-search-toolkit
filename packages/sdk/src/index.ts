@@ -47,6 +47,7 @@ export type { ErrorCode } from "./errors.js";
 
 export {
   resolveConfig,
+  loadConfig,
   redactedConfig,
   configuredVendorIds,
   isVendorConfigured,
@@ -55,10 +56,23 @@ export {
 export type {
   ResolvedConfig,
   RedactedConfig,
+  KeychainState,
+  LoadConfigOptions,
+  ResolveConfigOptions,
   VendorCredentials,
   CredentialsByVendor,
   Env,
 } from "./config.js";
+
+export {
+  KEYCHAIN_SERVICE,
+  CREDENTIAL_KEYS,
+  bunSecretStore,
+  readKeychainValues,
+  vendorCredentialKeys,
+  vendorForCredentialKey,
+} from "./secrets.js";
+export type { SecretStore, KeychainStatus, KeychainReadResult } from "./secrets.js";
 
 export { canonicalizeUrl, displayHost } from "./canonical.js";
 export { normalizeDate, truncateText, nonEmptyString, unique } from "./normalize.js";

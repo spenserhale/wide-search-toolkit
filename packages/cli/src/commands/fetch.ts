@@ -1,5 +1,5 @@
 import { buildCommand } from "@stricli/core";
-import { fetchPages, resolveConfig, WideSearchError } from "@wide-search-toolkit/sdk";
+import { fetchPages, loadConfig, WideSearchError } from "@wide-search-toolkit/sdk";
 import { exitCodeForFetchReport, runCommand } from "../lib/errors.js";
 import { formatFlags, type FormatFlagValues } from "../lib/flags.js";
 import { emit } from "../lib/output.js";
@@ -71,7 +71,7 @@ export const fetchCommand = buildCommand({
   },
   async func(this: void, flags: FetchFlags, positionalUrl?: string) {
     await runCommand(async () => {
-      const config = resolveConfig();
+      const config = await loadConfig();
       const urls = [positionalUrl, ...(flags.url ?? [])].filter(
         (url): url is string => typeof url === "string" && url.trim().length > 0,
       );

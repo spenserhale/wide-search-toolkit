@@ -1,7 +1,7 @@
 import type { FastMCP } from "fastmcp";
 import {
   listVendorStatusFromConfig,
-  resolveConfig,
+  loadConfig,
 } from "@wide-search-toolkit/sdk";
 
 export function registerVendorTools(server: FastMCP): void {
@@ -14,7 +14,7 @@ export function registerVendorTools(server: FastMCP): void {
       readOnlyHint: true,
     },
     execute: async () => {
-      const config = resolveConfig();
+      const config = await loadConfig();
       const vendors = listVendorStatusFromConfig(config);
       const payload = {
         configured: vendors.filter((vendor) => vendor.configured).length,

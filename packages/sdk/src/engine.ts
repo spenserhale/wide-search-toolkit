@@ -2,7 +2,7 @@ import { cacheKeyFor, SearchCache } from "./cache.js";
 import {
   configuredVendorIds,
   isVendorConfigured,
-  resolveConfig,
+  loadConfig,
   type ResolvedConfig,
 } from "./config.js";
 import { WideSearchError, isWideSearchError } from "./errors.js";
@@ -69,7 +69,7 @@ export async function searchWide(
   options: SearchOptions,
   deps: SearchDeps = {},
 ): Promise<SearchReport> {
-  const config = deps.config ?? resolveConfig();
+  const config = deps.config ?? (await loadConfig());
   const now = deps.now ?? Date.now;
   const started = performance.now();
   const query = options.query.trim();

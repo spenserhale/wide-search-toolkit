@@ -18,6 +18,8 @@ Read this guide when changing `fetchPages`, adding a delivery sink, touching cre
 - **Keep secrets out of output.** `config show` reports set/missing and the winning source, never the value. Error bodies are truncated before they reach a report.
 - **Restrict cache files.** The cache directory is created with user-only permissions; entries are written to a temp file and atomically renamed with mode `0600`.
 - **No webhook delivery in v0.1.** A webhook is a second SSRF-capable egress path. `--deliver` supports stdout and atomic file writes only.
+- **Secrets never travel in argv.** `wide-search auth set` takes keys from a hidden TTY prompt or `--stdin`, never from an argument or flag value, so they stay out of shell history and `ps`. Its output names keys and actions, never values.
+- **The keychain is the persistent no-plaintext store.** `auth` writes through `Bun.secrets` to the OS credential store under service `wide-search`. The MCP server reads it but exposes no tool that writes or deletes secrets. See [decision 0007](../decisions/0007-os-keychain-credential-store.md).
 - **Live E2E keys live only in process memory.** `tests/e2e/op.env.tpl` contains `op://` references, not keys. The helper runs `op inject` with stdout captured, parses it in memory, and passes the values to the child CLI/MCP environment. It never writes a rendered file, cache entry, fixture, or log line, and it omits injected stdout from error messages. Live tests skip unless `WIDE_SEARCH_OP_E2E=1`.
 
 ## Implementation notes
@@ -26,7 +28,8 @@ Read this guide when changing `fetchPages`, adding a delivery sink, touching cre
 - The HTTP request uses `node:http`/`node:https` with a custom `lookup`; this is deliberate because a plain `fetch` cannot pin the address. Do not replace it with `fetch` without preserving the pin.
 - The fetch path handles gzip, deflate, and brotli with a decompressed byte cap. A new encoding needs the same cap.
 - The MCP tools are annotated `readOnlyHint: true` and `openWorldHint: true`. `fetch_pages` is read-only but still performs outbound requests; do not downgrade the private-host guard to a tool argument.
-- Vendor API keys are read from env, `.env`, or the user config file. They are never written to the cache or report.
+- Vendor API keys are read from env, `.env`, the OS keychain, or the user config file (`loadConfig()` in `packages/sdk/src/config.ts`, store in `packages/sdk/src/secrets.ts`). They are never written to the cache or report. Keychain errors are reduced to a short message in `keychain.error`; never include a value in that path.
+- Tests never touch the real keychain: unit tests inject an in-memory `SecretStore`, and spawned CLI/MCP tests set `WIDE_SEARCH_KEYCHAIN=0`.
 - The error object keeps `statusCode` and `retryAfterSeconds`; use them for hints, not for secrets.
 
 ## Related docs

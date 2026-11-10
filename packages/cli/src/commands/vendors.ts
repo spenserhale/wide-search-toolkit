@@ -1,7 +1,7 @@
 import { buildCommand } from "@stricli/core";
 import {
   listVendorStatusFromConfig,
-  resolveConfig,
+  loadConfig,
   type VendorStatus,
 } from "@wide-search-toolkit/sdk";
 import { runCommand } from "../lib/errors.js";
@@ -41,7 +41,7 @@ export const vendorsCommand = buildCommand({
   },
   async func(this: void, flags: FormatFlagValues) {
     await runCommand(async () => {
-      const config = resolveConfig();
+      const config = await loadConfig();
       const vendors = listVendorStatusFromConfig(config);
       const payload = {
         configured: vendors.filter((vendor) => vendor.configured).length,

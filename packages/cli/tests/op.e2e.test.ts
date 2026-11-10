@@ -23,6 +23,7 @@ function childEnv(home: string): Record<string, string> {
   return {
     PATH: process.env.PATH ?? "",
     HOME: home,
+    WIDE_SEARCH_KEYCHAIN: "0",
     WIDE_SEARCH_CONFIG_FILE: join(home, "missing-config.json"),
     ...loadOpEnv(template),
   };

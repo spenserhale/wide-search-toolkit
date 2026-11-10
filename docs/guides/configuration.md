@@ -1,6 +1,6 @@
 ---
 title: "Configuration and environment setup"
-description: Read this when setting up vendor keys for the CLI or an MCP host, or when a CLI command works but the MCP server cannot see the same credentials.
+description: Read this when setting up vendor keys for the CLI or an MCP host, storing keys in the OS keychain, or when a CLI command works but the MCP server cannot see the same credentials.
 ---
 
 ## Purpose
@@ -9,28 +9,32 @@ Read this guide when configuring a machine for `wide-search`, comparing CLI and 
 
 ## The shared resolver
 
-The CLI, MCP server, and SDK all call the same `resolveConfig()` in `packages/sdk/src/config.ts`. The precedence is identical:
+The CLI, MCP server, and SDK default all call the same `loadConfig()` in `packages/sdk/src/config.ts`. The precedence is identical:
 
 ```
 process environment
   > nearest .env walking up from the current working directory
+  > OS keychain (vendor keys only; service "wide-search")
   > ~/.config/wide-search/config.json
   > built-in default
 ```
+
+The keychain is only asked for keys that the environment and `.env` files did not supply, so an explicit key never triggers a keychain prompt. If the keychain is unavailable (no Secret Service on Linux, a locked keychain, a non-Bun runtime), the lookup is skipped and the rest of the chain works as before. Set `WIDE_SEARCH_KEYCHAIN=0` to turn the lookup off. See [decision 0007](../decisions/0007-os-keychain-credential-store.md).
 
 The difference is **where the process environment comes from**:
 
 | Surface | Process environment source | Project `.env` discovery | Best persistent setup |
 |---|---|---|---|
-| CLI | Your shell, `op run`, or CI | Walks up from the directory where you run `wide-search` | `op run --env-file=... -- wide-search ...` or shell env |
-| MCP | The host's `env` block plus whatever the host inherits | Only if the server's cwd is inside the project; many hosts launch from elsewhere | The host's `env` block, `~/.config/wide-search/config.json`, or an `op run` wrapper |
+| CLI | Your shell, `op run`, or CI | Walks up from the directory where you run `wide-search` | `wide-search auth set <vendor>` (keychain), or `op run` |
+| MCP | The host's `env` block plus whatever the host inherits | Only if the server's cwd is inside the project; many hosts launch from elsewhere | The keychain (no `env` block needed), or an `op run` wrapper |
 
-An MCP host is not a shell. It spawns the server as a child process with a `command`, `args`, and `env`. If you put a key in a project `.env`, the CLI finds it from the project root, but the MCP server only finds it if the host happens to start the server with that project as cwd. Do not rely on that. Use the host `env` block, the user config, or wrap the server command in `op run`.
+An MCP host is not a shell. It spawns the server as a child process with a `command`, `args`, and `env`. If you put a key in a project `.env`, the CLI finds it from the project root, but the MCP server only finds it if the host happens to start the server with that project as cwd. Do not rely on that. The keychain does not depend on cwd or inherited env, so a key stored once with `wide-search auth set` reaches both surfaces.
 
 ## Setup options at a glance
 
 | Option | CLI | MCP | Plaintext at rest? | When to use |
 |---|---|---|---|---|
+| **OS keychain (`wide-search auth set`)** | Yes | Yes, with no `env` block | No; encrypted by the OS | Default persistent setup on a desktop machine |
 | Terminal exports (`export KEY=...`) | Yes | Conditional: only if the host inherited that shell | No file; process memory | Quick CLI session; a host launched from the same terminal |
 | **MCP host `env` block** | Not applicable | Yes | Yes, in the host config | Simplest persistent MCP setup |
 | `op run --env-file=<op-reference-template>` | Yes | Yes, as a wrapper command | No rendered file | No-plaintext setup for either surface |
@@ -38,11 +42,66 @@ An MCP host is not a shell. It spawns the server as a child process with a `comm
 | User config `~/.config/wide-search/config.json` | Yes | Yes | Yes if it contains `keys` | Non-secret defaults; machine-wide options |
 | CLI flags / MCP tool arguments | Yes | Yes | No | Per-call overrides only |
 
-The **MCP host `env` block** is the normal persistent MCP option. The CLI normally uses terminal exports or `op run`. Both surfaces share the same variable names, so a key moved from one option to another keeps working.
+The **OS keychain** is the recommended persistent option for both surfaces on a desktop machine. `op run` is the recommended option when keys already live in 1Password or the machine is headless. Every option uses the same variable names (keychain entries are named by env var), so a key moved from one option to another keeps working.
+
+## OS keychain setup
+
+`wide-search auth` stores keys with `Bun.secrets`: macOS Keychain Services, Linux libsecret (GNOME Keyring, KWallet), or Windows Credential Manager. Each entry uses service `wide-search` and the env-var name as the account, for example `wide-search` / `EXA_API_KEY`. On macOS you can see and delete them in Keychain Access.app.
+
+### Interactive: hidden prompt
+
+On a terminal, `auth set` prompts without echoing what you type or paste:
+
+```bash
+wide-search auth set exa
+# EXA_API_KEY: ••••••••   (nothing is shown)
+# stored EXA_API_KEY in os-keychain:wide-search
+
+wide-search auth set dataforseo     # prompts for DATAFORSEO_LOGIN, then DATAFORSEO_PASSWORD
+```
+
+### Non-interactive: `--stdin`
+
+Scripts and agents pipe the value with `--stdin`. One key per call; vendors with two keys need `--key`:
+
+```bash
+pbpaste | wide-search auth set exa --stdin                # macOS clipboard
+op read 'op://Private/Tavily/default' | wide-search auth set tavily --stdin
+printf '%s' "$FIRECRAWL_API_KEY" | wide-search auth set firecrawl --stdin
+op read 'op://Private/DataForSEO/username' | wide-search auth set dataforseo --key DATAFORSEO_LOGIN --stdin
+op read 'op://Private/DataForSEO/password' | wide-search auth set dataforseo --key DATAFORSEO_PASSWORD --stdin
+```
+
+Without a terminal and without `--stdin`, `auth set` exits 2 instead of hanging. The key is never accepted as an argument or flag value, because arguments land in shell history and `ps` output. Add `--dry-run` to validate without writing.
+
+### Related commands
+
+| Command | What it does |
+|---|---|
+| `wide-search auth set <vendor> [--key NAME] [--stdin] [--dry-run]` | Store a key. Output flags a key that an env var or `.env` still overrides (`shadowed_by`). |
+| `wide-search auth list` | Every credential key with keychain `set`/`missing` and the active source. Never prints values. |
+| `wide-search auth delete <vendor> [--key NAME] --yes [--dry-run]` | Remove keychain entries. Refuses without `--yes`. |
+| `wide-search auth migrate [--dry-run] [--overwrite]` | Copy keys whose active source is a `.env` file or the user config into the keychain. Skips keys already stored unless `--overwrite`. Leaves process-environment keys (op run, CI) alone. Does not edit files; it lists them under `clean_up`. |
+
+A typical move off a plaintext `.env`:
+
+```bash
+wide-search auth migrate --dry-run   # see what would move
+wide-search auth migrate             # store them
+# delete the listed keys from each clean_up file: a .env value keeps overriding the keychain
+wide-search auth list                # active source should now read "keychain"
+```
+
+### Keychain caveats
+
+- **Access prompts (macOS).** The process that created an entry can read it silently. A different binary may trigger a "wants to use your confidential information" dialog the first time, for example after some Bun upgrades or from a compiled binary. Choose **Always Allow**. A GUI MCP host shows the same dialog on screen.
+- **Linux** needs a running Secret Service daemon. Headless servers and CI often have none; there, `loadConfig()` reports `keychain.status: "unavailable"` and you should use env vars or `op run`.
+- **Runtime.** The lookup needs Bun (the CLI and MCP server already run on Bun). SDK consumers on Node skip it.
+- **Threat model.** The keychain keeps keys out of files that get committed, synced, backed up, or read by other tools. It does not protect against malware already running as your user once access has been granted.
 
 ## CLI setup
 
-### Recommended: inject at run time with 1Password
+### 1Password: inject at run time
 
 Create a private template containing only `op://` references (never literal keys):
 
@@ -110,9 +169,26 @@ For MCP, inherited environment depends on **how the host was launched**. A host 
 
 ## MCP setup
 
+### Recommended: keychain, no `env` block
+
+Store keys once with `wide-search auth set <vendor>` (see [OS keychain setup](#os-keychain-setup)), then register the server with no secrets at all:
+
+```json
+{
+  "mcpServers": {
+    "wide-search": {
+      "command": "bun",
+      "args": ["run", "/absolute/path/to/wide-search-toolkit/packages/mcp/src/index.ts"]
+    }
+  }
+}
+```
+
+The server reads the keychain on each tool call, so a key added or rotated with `auth set` is picked up without restarting the host. The host config file holds no secrets, so it is safe to commit (for example a project `.mcp.json`) or sync. Check with `list_vendors()`; if a vendor shows unconfigured, run `wide-search auth list` and look for a macOS access dialog the host may be waiting on.
+
 ### Option A: host `env` block
 
-This is the simplest persistent setup, and the values are plaintext in the host config:
+This works everywhere, including hosts without a keychain, but the values are plaintext in the host config:
 
 ```json
 {
@@ -193,7 +269,8 @@ This writes no file, but a GUI host launched by the operating system usually sta
 
 | Surface | Command/tool | What it shows |
 |---|---|---|
-| CLI | `wide-search config show --json` | Resolved values, winning sources, keys as set/missing |
+| CLI | `wide-search config show --json` | Resolved values, winning sources (`env`, `envfile:<path>`, `keychain`, `config:<path>`), keys as set/missing, `keychain.status` |
+| CLI | `wide-search auth list` | Keychain set/missing per key and the active source |
 | CLI | `wide-search vendors --json` | Nine vendors, configured true/false, limits, freshness, costs |
 | MCP | `list_vendors()` | Vendor catalog with configured true/false |
 | Both | `search_wide` / `search` `vendors[]` | Per-vendor `ok`, `timeout`, `error`, `skipped_budget`, `skipped_unconfigured` |
@@ -214,7 +291,7 @@ These are all plaintext at rest and must be protected or avoided:
 - `~/.config/wide-search/config.json` if it contains `keys`;
 - an MCP host `env` block with literal key values.
 
-`op run --env-file=<template-with-op-references>` is the recommended no-plaintext path for both surfaces. The E2E harness uses `op inject` in memory for the same reason; see [testing](testing.md) and [decision 0006](../decisions/0006-op-inject-e2e-secrets.md).
+The OS keychain (`wide-search auth set`) and `op run --env-file=<template-with-op-references>` are the two no-plaintext paths for both surfaces. Use `wide-search auth migrate` to move existing plaintext keys into the keychain. The E2E harness uses `op inject` in memory for the same reason; see [testing](testing.md) and [decision 0006](../decisions/0006-op-inject-e2e-secrets.md).
 
 ## Related docs
 

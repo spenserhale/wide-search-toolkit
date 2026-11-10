@@ -1,5 +1,5 @@
 import { buildCommand } from "@stricli/core";
-import { resolveConfig, SearchCache } from "@wide-search-toolkit/sdk";
+import { loadConfig, SearchCache } from "@wide-search-toolkit/sdk";
 import { runCommand } from "../../lib/errors.js";
 import { formatFlags, type FormatFlagValues } from "../../lib/flags.js";
 import { emit } from "../../lib/output.js";
@@ -18,7 +18,7 @@ export const cacheStatsCommand = buildCommand({
   },
   async func(this: void, flags: FormatFlagValues) {
     await runCommand(async () => {
-      const config = resolveConfig();
+      const config = await loadConfig();
       const cache = new SearchCache({ dir: config.cacheDir, ttlMs: config.cacheTtlMs });
       const stats = cache.stats();
       await emit(stats, flags, {

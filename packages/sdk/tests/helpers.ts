@@ -36,6 +36,7 @@ export function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedCon
     },
     sources: {},
     credentialSources: {},
+    keychain: { status: "disabled" },
     envFiles: [],
     configFile: null,
     cwd: process.cwd(),

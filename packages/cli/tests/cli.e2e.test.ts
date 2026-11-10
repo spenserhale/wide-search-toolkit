@@ -16,6 +16,7 @@ function cleanEnv(cwd: string): Record<string, string> {
   const env: Record<string, string> = {
     PATH: process.env.PATH ?? "",
     HOME: cwd,
+    WIDE_SEARCH_KEYCHAIN: "0",
     WIDE_SEARCH_CONFIG_FILE: join(cwd, "missing-config.json"),
   };
   return env;
@@ -24,11 +25,13 @@ function cleanEnv(cwd: string): Record<string, string> {
 async function runCli(
   args: string[],
   cwd: string,
+  stdinText?: string,
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   const proc = Bun.spawn({
     cmd: ["bun", "run", bin, ...args],
     cwd,
     env: cleanEnv(cwd),
+    stdin: stdinText === undefined ? "ignore" : new Blob([stdinText]),
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -97,5 +100,42 @@ describe("CLI end-to-end", () => {
       vendors: unknown[];
     };
     expect(payload.vendors).toHaveLength(9);
+  });
+
+  it("refuses auth set without a terminal unless --stdin is passed", async () => {
+    const result = await runCli(["auth", "set", "exa"], tempDir());
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain("--stdin");
+  });
+
+  it("refuses auth set --stdin for a two-key vendor without --key", async () => {
+    const result = await runCli(["auth", "set", "dataforseo", "--stdin"], tempDir(), "x\n");
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain("--key DATAFORSEO_LOGIN");
+  });
+
+  it("previews auth set --stdin --dry-run without writing or echoing the key", async () => {
+    const result = await runCli(
+      ["auth", "set", "exa", "--stdin", "--dry-run", "--json"],
+      tempDir(),
+      "dry-run-secret\n",
+    );
+    expect(result.code).toBe(0);
+    const payload = JSON.parse(result.stdout);
+    expect(payload.dry_run).toBe(true);
+    expect(payload.credentials[0].action).toBe("would_store");
+    expect(result.stdout + result.stderr).not.toContain("dry-run-secret");
+  });
+
+  it("requires --yes for auth delete", async () => {
+    const result = await runCli(["auth", "delete", "exa"], tempDir());
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain("--yes");
+  });
+
+  it("rejects an unknown vendor for auth commands", async () => {
+    const result = await runCli(["auth", "delete", "bing", "--yes"], tempDir());
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain("Unknown vendor");
   });
 });

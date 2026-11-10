@@ -3,6 +3,13 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { z } from "zod";
 import { WideSearchError } from "./errors.js";
+import {
+  bunSecretStore,
+  CREDENTIAL_KEYS,
+  readKeychainValues,
+  type KeychainStatus,
+  type SecretStore,
+} from "./secrets.js";
 import { VENDOR_IDS, type OutputFormat, type VendorId } from "./types.js";
 
 export type Env = Record<string, string | undefined>;
@@ -27,9 +34,16 @@ export interface ResolvedConfig {
   credentials: CredentialsByVendor;
   sources: Record<string, string>;
   credentialSources: Record<string, string>;
+  /** Whether the OS keychain was consulted for credentials. */
+  keychain: KeychainState;
   envFiles: string[];
   configFile: string | null;
   cwd: string;
+}
+
+export interface KeychainState {
+  status: KeychainStatus;
+  error?: string;
 }
 
 export interface ResolveConfigOptions {
@@ -37,6 +51,15 @@ export interface ResolveConfigOptions {
   env?: Env;
   /** Pass null to skip reading a user config file. */
   configFile?: string | null;
+  /** Credentials already read from the OS keychain; see loadConfig(). */
+  keychainValues?: Record<string, string>;
+  /** Keychain lookup status to report; defaults to disabled. */
+  keychain?: KeychainState;
+}
+
+export interface LoadConfigOptions extends Omit<ResolveConfigOptions, "keychainValues" | "keychain"> {
+  /** Store to read keys from. Defaults to the OS keychain; pass null to skip it. */
+  secretStore?: SecretStore | null;
 }
 
 const ConfigFileSchema = z
@@ -242,7 +265,7 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
     return [...VENDOR_IDS];
   };
 
-  const resolvedCredentials = resolveCredentials(pickEnv, configFile);
+  const resolvedCredentials = resolveCredentials(pickEnv, options.keychainValues ?? {}, configFile);
   const credentials = resolvedCredentials.credentials;
   const credentialSources = resolvedCredentials.sources;
 
@@ -348,10 +371,42 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
     credentials,
     sources,
     credentialSources,
+    keychain: options.keychain ?? { status: "disabled" },
     envFiles: envFile.files,
     configFile: configFile?.path ?? null,
     cwd,
   };
+}
+
+/**
+ * resolveConfig() plus the OS keychain. Only credentials that the process
+ * environment and .env files did not supply are looked up, so an explicit
+ * key never triggers a keychain prompt. Set WIDE_SEARCH_KEYCHAIN=0 to skip
+ * the lookup entirely.
+ */
+export async function loadConfig(options: LoadConfigOptions = {}): Promise<ResolvedConfig> {
+  const { secretStore, ...resolveOptions } = options;
+  const cwd = resolve(resolveOptions.cwd ?? process.cwd());
+  const env = resolveOptions.env ?? process.env;
+  const envFile = readEnvFiles(cwd);
+  const keychainSwitch = env.WIDE_SEARCH_KEYCHAIN ?? envFile.values.WIDE_SEARCH_KEYCHAIN;
+  const disabled =
+    secretStore === null ||
+    ["0", "false", "no", "off"].includes((keychainSwitch ?? "").trim().toLowerCase());
+  if (disabled) {
+    return resolveConfig({ ...resolveOptions, keychain: { status: "disabled" } });
+  }
+
+  const missing = CREDENTIAL_KEYS.filter((name) => !env[name] && !envFile.values[name]);
+  if (missing.length === 0) {
+    return resolveConfig({ ...resolveOptions, keychain: { status: "ok" } });
+  }
+  const result = await readKeychainValues(secretStore ?? bunSecretStore(), missing);
+  return resolveConfig({
+    ...resolveOptions,
+    keychainValues: result.values,
+    keychain: result.error ? { status: result.status, error: result.error } : { status: result.status },
+  });
 }
 
 function parseVendorList(raw: string): VendorId[] {
@@ -383,6 +438,7 @@ function parseVendorList(raw: string): VendorId[] {
 
 function resolveCredentials(
   pickEnv: (names: readonly string[]) => ResolvedValue<string> | null,
+  keychainValues: Record<string, string>,
   configFile: { path: string; data: ConfigFile } | null,
 ): { credentials: CredentialsByVendor; sources: Record<string, string> } {
   const sources: Record<string, string> = {};
@@ -395,6 +451,11 @@ function resolveCredentials(
     if (envValue) {
       sources[key] = envValue.source;
       return envValue.value;
+    }
+    const keychainValue = keychainValues[key];
+    if (keychainValue) {
+      sources[key] = "keychain";
+      return keychainValue;
     }
     if (configValue) {
       sources[key] = configFile ? `config:${configFile.path}` : "config";
@@ -579,6 +640,7 @@ export interface RedactedConfig {
   sources: Record<string, string>;
   credentials: Record<VendorId, Record<string, "set" | "missing">>;
   credential_sources: Record<string, string>;
+  keychain: KeychainState;
   vendors_configured: VendorId[];
 }
 
@@ -614,6 +676,7 @@ export function redactedConfig(config: ResolvedConfig): RedactedConfig {
     sources: config.sources,
     credentials,
     credential_sources: config.credentialSources,
+    keychain: config.keychain,
     vendors_configured: configuredVendorIds(config.credentials),
   };
 }
