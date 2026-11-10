@@ -124,7 +124,7 @@ const DEFAULTS = {
   snippetChars: 500,
   allowPrivateHosts: false,
   output: "toon" as OutputFormat,
-  userAgent: "wide-search/0.2.0",
+  userAgent: "wide-search/0.2.1",
 } as const;
 
 const VENDOR_ENV_KEYS: Record<VendorId, readonly string[]> = {

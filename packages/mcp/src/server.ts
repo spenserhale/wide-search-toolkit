@@ -6,7 +6,7 @@ import { registerVendorTools } from "./tools/vendors.js";
 export function createServer(): FastMCP {
   const server = new FastMCP({
     name: "wide-search-toolkit",
-    version: "0.2.0",
+    version: "0.2.1",
     instructions:
       "Wide-search fans one query out to multiple independent web-search vendors, dedupes by canonical URL, ranks with reciprocal rank fusion, and reports per-vendor status. " +
       "Call search_wide for broad research, vendor-gap analysis, or a result set wider than one index. " +

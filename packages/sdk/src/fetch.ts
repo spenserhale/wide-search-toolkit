@@ -88,7 +88,7 @@ export async function fetchPages(options: FetchPagesOptions): Promise<FetchRepor
     });
   }
   const allowPrivateHosts = options.allowPrivateHosts === true;
-  const userAgent = options.userAgent ?? "wide-search/0.2.0";
+  const userAgent = options.userAgent ?? "wide-search/0.2.1";
   const started = performance.now();
 
   const pages: FetchPage[] = new Array(urls.length);
