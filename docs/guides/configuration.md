@@ -277,6 +277,8 @@ This writes no file, but a GUI host launched by the operating system usually sta
 
 If the CLI sees a key but the MCP server does not, check the MCP host's cwd and `env` block first. The server does not share your interactive shell's environment automatically.
 
+Values that are clearly not keys are ignored in every source and the next source is tried: blank values, `.env` comments (`KEY= # paste here`), unresolved `op://` references, and unexpanded `$NAME` / `${NAME}` references (common in MCP host `env` blocks that do not expand variables). When nothing usable remains, the source reads `ignored:<source> (<reason>)`, for example `ignored:env (unresolved 1Password reference; run through op run or op inject)`, and the vendor is reported as `skipped_unconfigured` without a request. A real but wrong or revoked key still reaches the vendor and fails with `E_AUTH`; `credential_sources` tells you where it came from.
+
 ## Per-call overrides
 
 - CLI: `--vendor`, `--max-per-vendor`, `--mode`, `--budget-usd`, `--freshness`, `--limit`, `--timeout-ms`, `--no-cache`.

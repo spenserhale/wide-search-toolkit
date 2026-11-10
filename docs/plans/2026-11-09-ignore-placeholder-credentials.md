@@ -1,7 +1,7 @@
 ---
 title: "Plan: Ignore blank and placeholder credentials"
 description: "Treat blank, commented, and unresolved-reference credential values as missing so the engine never calls a vendor with a placeholder key."
-status: in-progress
+status: done
 date: 2026-11-09
 size: bounded
 specs: ["wide-search"]

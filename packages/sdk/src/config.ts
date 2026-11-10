@@ -139,6 +139,21 @@ const VENDOR_ENV_KEYS: Record<VendorId, readonly string[]> = {
   tinyfish: ["TINYFISH_API_KEY"],
 };
 
+/**
+ * Why a credential value is not a usable key, or null when it is. Blank
+ * values, `.env` comments, unresolved 1Password references, and unexpanded
+ * shell/MCP-host variable references would otherwise be sent to the vendor
+ * and come back as HTTP 401.
+ */
+export function credentialValueProblem(value: string | undefined): string | null {
+  const trimmed = (value ?? "").trim();
+  if (trimmed === "") return "blank";
+  if (trimmed.startsWith("#")) return "comment, not a key";
+  if (trimmed.startsWith("op://")) return "unresolved 1Password reference; run through op run or op inject";
+  if (/^\$(\{[^}]*\}|[A-Za-z_][A-Za-z0-9_]*)$/.test(trimmed)) return "unexpanded variable reference";
+  return null;
+}
+
 export function vendorEnvKeys(id: VendorId): readonly string[] {
   return VENDOR_ENV_KEYS[id];
 }
@@ -265,7 +280,12 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
     return [...VENDOR_IDS];
   };
 
-  const resolvedCredentials = resolveCredentials(pickEnv, options.keychainValues ?? {}, configFile);
+  const resolvedCredentials = resolveCredentials(
+    env,
+    envFile,
+    options.keychainValues ?? {},
+    configFile,
+  );
   const credentials = resolvedCredentials.credentials;
   const credentialSources = resolvedCredentials.sources;
 
@@ -397,7 +417,11 @@ export async function loadConfig(options: LoadConfigOptions = {}): Promise<Resol
     return resolveConfig({ ...resolveOptions, keychain: { status: "disabled" } });
   }
 
-  const missing = CREDENTIAL_KEYS.filter((name) => !env[name] && !envFile.values[name]);
+  const missing = CREDENTIAL_KEYS.filter(
+    (name) =>
+      credentialValueProblem(env[name]) !== null &&
+      credentialValueProblem(envFile.values[name]) !== null,
+  );
   if (missing.length === 0) {
     return resolveConfig({ ...resolveOptions, keychain: { status: "ok" } });
   }
@@ -437,7 +461,8 @@ function parseVendorList(raw: string): VendorId[] {
 }
 
 function resolveCredentials(
-  pickEnv: (names: readonly string[]) => ResolvedValue<string> | null,
+  env: Env,
+  envFile: EnvFileData,
   keychainValues: Record<string, string>,
   configFile: { path: string; data: ConfigFile } | null,
 ): { credentials: CredentialsByVendor; sources: Record<string, string> } {
@@ -447,21 +472,31 @@ function resolveCredentials(
     envNames: readonly string[],
     configValue?: string,
   ): string | undefined => {
-    const envValue = pickEnv(envNames);
-    if (envValue) {
-      sources[key] = envValue.source;
-      return envValue.value;
+    const candidates: Array<{ value: string | undefined; source: string }> = [];
+    for (const name of envNames) {
+      candidates.push({ value: env[name], source: "env" });
+      candidates.push({
+        value: envFile.values[name],
+        source: `envfile:${envFile.sources[name] ?? "unknown"}`,
+      });
     }
-    const keychainValue = keychainValues[key];
-    if (keychainValue) {
-      sources[key] = "keychain";
-      return keychainValue;
+    candidates.push({ value: keychainValues[key], source: "keychain" });
+    candidates.push({
+      value: configValue,
+      source: configFile ? `config:${configFile.path}` : "config",
+    });
+
+    let firstIgnored: string | undefined;
+    for (const candidate of candidates) {
+      if (candidate.value === undefined || candidate.value === "") continue;
+      const problem = credentialValueProblem(candidate.value);
+      if (problem === null) {
+        sources[key] = candidate.source;
+        return candidate.value.trim();
+      }
+      firstIgnored ??= `ignored:${candidate.source} (${problem})`;
     }
-    if (configValue) {
-      sources[key] = configFile ? `config:${configFile.path}` : "config";
-      return configValue;
-    }
-    sources[key] = "missing";
+    sources[key] = firstIgnored ?? "missing";
     return undefined;
   };
 
@@ -575,6 +610,9 @@ function parseEnvFile(path: string): Env {
       (value.startsWith("'") && value.endsWith("'"))
     ) {
       value = value.slice(1, -1);
+    } else if (value.startsWith("#")) {
+      // `KEY= # comment`: the comment starts right after the trimmed `=`.
+      value = "";
     } else {
       const comment = value.indexOf(" #");
       if (comment >= 0) value = value.slice(0, comment).trim();

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SearchCache } from "../src/cache.js";
+import { resolveConfig } from "../src/config.js";
 import { searchWide } from "../src/engine.js";
 import { WideSearchError } from "../src/errors.js";
 import { fakeAdapter, makeConfig, result } from "./helpers.js";
@@ -153,6 +154,37 @@ describe("searchWide", () => {
     const perplexity = report.vendors.find((vendor) => vendor.vendor === "perplexity");
     expect(perplexity?.status).toBe("skipped_unconfigured");
     expect(perplexity?.reason).toContain("PERPLEXITY_API_KEY");
+  });
+
+  it("never calls a vendor whose key is a placeholder", async () => {
+    const resolved = resolveConfig({
+      cwd: tempDir(),
+      env: { EXA_API_KEY: "exa-key", PERPLEXITY_API_KEY: "op://Private/Perplexity/credential" },
+      configFile: null,
+    });
+    const config = makeConfig({ vendors: ["exa", "perplexity"], credentials: resolved.credentials });
+    let perplexityCalled = false;
+    const perplexity = fakeAdapter("perplexity", []);
+    const originalSearch = perplexity.search.bind(perplexity);
+    perplexity.search = async (...args) => {
+      perplexityCalled = true;
+      return originalSearch(...args);
+    };
+    const report = await searchWide(
+      { query: "placeholder", cache: false },
+      {
+        config,
+        adapters: {
+          exa: fakeAdapter("exa", [result("exa", 1, "https://exa.example.com/")]),
+          perplexity,
+        },
+      },
+    );
+
+    expect(perplexityCalled).toBe(false);
+    const perplexityReport = report.vendors.find((vendor) => vendor.vendor === "perplexity");
+    expect(perplexityReport?.selected).toBe(false);
+    expect(perplexityReport?.status).toBe("skipped_unconfigured");
   });
 
   it("serves a complete successful report from cache without repeating vendor calls", async () => {

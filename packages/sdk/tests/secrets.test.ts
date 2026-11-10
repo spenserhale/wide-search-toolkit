@@ -127,3 +127,29 @@ describe("keychain credential resolution", () => {
     expect(result).toEqual({ status: "ok", values: { EXA_API_KEY: "a" } });
   });
 });
+
+describe("keychain behind placeholder values", () => {
+  it("asks the keychain for a key whose env value is a placeholder", async () => {
+    const store = memoryStore({ PERPLEXITY_API_KEY: "pplx-from-keychain" });
+    const config = await loadConfig({
+      cwd: tempDir(),
+      env: { PERPLEXITY_API_KEY: "${PERPLEXITY_API_KEY}" },
+      configFile: null,
+      secretStore: store,
+    });
+    expect(store.requested).toContain("PERPLEXITY_API_KEY");
+    expect(config.credentials.perplexity.PERPLEXITY_API_KEY).toBe("pplx-from-keychain");
+    expect(config.credentialSources.PERPLEXITY_API_KEY).toBe("keychain");
+  });
+
+  it("ignores a placeholder stored in the keychain", async () => {
+    const config = await loadConfig({
+      cwd: tempDir(),
+      env: {},
+      configFile: null,
+      secretStore: memoryStore({ EXA_API_KEY: "   " }),
+    });
+    expect(config.credentials.exa.EXA_API_KEY).toBeUndefined();
+    expect(config.credentialSources.EXA_API_KEY).toStartWith("ignored:keychain (");
+  });
+});

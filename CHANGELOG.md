@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Blank, commented, `op://`, and unexpanded `$NAME` / `${NAME}` credential values no longer count as configured, so the vendor is skipped instead of failing with HTTP 401. A real key in a lower-precedence source still wins, `config show` / `auth list` report `ignored:<source> (<reason>)`, and `.env` lines like `KEY= # paste here` now parse as empty.
+
 ## [0.2.0] - 2026-11-09
 
 ### Added

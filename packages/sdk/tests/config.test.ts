@@ -99,3 +99,69 @@ describe("resolveConfig", () => {
     ).toThrow();
   });
 });
+
+describe("placeholder credentials", () => {
+  it("parses a .env comment right after = as an empty value", () => {
+    const cwd = tempDir();
+    writeFileSync(join(cwd, ".env"), "PERPLEXITY_API_KEY= # paste key here\nEXA_API_KEY=real # note\n");
+    const config = resolveConfig({ cwd, env: {}, configFile: null });
+    expect(config.credentials.perplexity.PERPLEXITY_API_KEY).toBeUndefined();
+    expect(config.credentialSources.PERPLEXITY_API_KEY).toBe("missing");
+    expect(config.credentials.exa.EXA_API_KEY).toBe("real");
+    expect(configuredVendorIds(config.credentials)).toEqual(["exa"]);
+  });
+
+  const placeholders: Array<[string, string]> = [
+    ["   ", "blank"],
+    ["#nope", "comment, not a key"],
+    ["op://Private/Perplexity/credential", "unresolved 1Password reference"],
+    ["${PERPLEXITY_API_KEY}", "unexpanded variable reference"],
+    ["$PERPLEXITY_API_KEY", "unexpanded variable reference"],
+  ];
+  for (const [value, reason] of placeholders) {
+    it(`ignores ${JSON.stringify(value)} from the environment`, () => {
+      const config = resolveConfig({
+        cwd: tempDir(),
+        env: { PERPLEXITY_API_KEY: value },
+        configFile: null,
+      });
+      expect(config.credentials.perplexity.PERPLEXITY_API_KEY).toBeUndefined();
+      expect(configuredVendorIds(config.credentials)).not.toContain("perplexity");
+      expect(config.credentialSources.PERPLEXITY_API_KEY).toStartWith("ignored:env (");
+      expect(config.credentialSources.PERPLEXITY_API_KEY).toContain(reason);
+    });
+  }
+
+  it("ignores placeholders in .env and the config file", () => {
+    const cwd = tempDir();
+    writeFileSync(join(cwd, ".env"), "EXA_API_KEY=op://Private/Exa/default\n");
+    const configFile = join(cwd, "config.json");
+    writeFileSync(configFile, JSON.stringify({ keys: { tavily: "${TAVILY_API_KEY}" } }));
+    const config = resolveConfig({ cwd, env: {}, configFile });
+    expect(configuredVendorIds(config.credentials)).toEqual([]);
+    expect(config.credentialSources.EXA_API_KEY).toStartWith("ignored:envfile:");
+    expect(config.credentialSources.TAVILY_API_KEY).toStartWith(`ignored:config:${configFile}`);
+  });
+
+  it("falls through a placeholder to a real key in a lower-precedence source", () => {
+    const cwd = tempDir();
+    const configFile = join(cwd, "config.json");
+    writeFileSync(configFile, JSON.stringify({ keys: { perplexity: "pplx-real" } }));
+    const config = resolveConfig({
+      cwd,
+      env: { PERPLEXITY_API_KEY: "op://Private/Perplexity/credential" },
+      configFile,
+    });
+    expect(config.credentials.perplexity.PERPLEXITY_API_KEY).toBe("pplx-real");
+    expect(config.credentialSources.PERPLEXITY_API_KEY).toBe(`config:${configFile}`);
+  });
+
+  it("trims usable credential values", () => {
+    const config = resolveConfig({
+      cwd: tempDir(),
+      env: { EXA_API_KEY: "  exa-key\n" },
+      configFile: null,
+    });
+    expect(config.credentials.exa.EXA_API_KEY).toBe("exa-key");
+  });
+});
