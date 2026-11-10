@@ -1,6 +1,6 @@
 {
   "name": "@wide-search-toolkit/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Agent-native CLI for wide-search: fan one query out to multiple web-search vendors and merge the results.",
   "license": "MIT",
   "author": "Spenser Hale",

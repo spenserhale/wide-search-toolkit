@@ -1,6 +1,6 @@
 {
   "name": "@wide-search-toolkit/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Core SDK for wide-search: vendor adapters, fan-out engine, dedupe, ranking, cache, and safe page fetching.",
   "license": "MIT",
   "author": "Spenser Hale",

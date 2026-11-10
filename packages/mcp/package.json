@@ -1,6 +1,6 @@
 {
   "name": "@wide-search-toolkit/mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server for wide-search: search_wide, fetch_pages, and list_vendors.",
   "license": "MIT",
   "author": "Spenser Hale",

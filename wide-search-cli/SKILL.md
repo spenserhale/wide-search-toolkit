@@ -5,7 +5,7 @@ description: "Reference for the `wide-search` CLI (from spenserhale/wide-search-
 
 # wide-search CLI
 
-Version 0.1.0. Fan one query out to multiple independent web-search vendors, normalize and dedupe by canonical URL, rank with reciprocal rank fusion, and report each vendor's status, latency, and estimated cost.
+Version 0.2.0. Fan one query out to multiple independent web-search vendors, normalize and dedupe by canonical URL, rank with reciprocal rank fusion, and report each vendor's status, latency, and estimated cost.
 
 ## Start here
 
